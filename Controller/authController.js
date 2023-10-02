@@ -81,6 +81,16 @@ const authController = {
             // await logErrors({mongoConnection: req.mongoConnection, err});
             res.send({ success: false, code: 500, data: err, message: 'something went wrong' })
         }
+    },
+    getMakerById: async (req, res) => {
+        try {
+            let data = await req.mongoConnection.collection('users').findOne({_id: req._id})
+            res.status(200).send({ success: true, code: 200, data: data, message: 'success' })
+        } catch(err) {
+            console.log(err, 8787);
+            // await logErrors({mongoConnection: req.mongoConnection, err});
+            res.send({ success: false, code: 500, data: err, message: 'something went wrong' })
+        }
     }
 }
 
