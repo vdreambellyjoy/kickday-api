@@ -49,7 +49,7 @@ const authController = {
         try {
             let update = await req.mongoConnection.collection('users').updateOne(
                 {email: req.body.email},
-                { $set : {bankDetails: req.body, draftDone: true}},
+                { $set : { ...req.body, draftDone: true}},
                 {upsert: true}
             )
             if (update) {
