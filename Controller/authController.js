@@ -1,97 +1,60 @@
 const jwt = require('jwt-simple');
 const configFile = require('../config');
-const authModel = require('../Model/authModel')
+const secret = configFile.secretKey
 const { ObjectId } = require('mongodb');
+const curdOperations = require('../model/curdOperations');
 
 
 const authController = {
     login: async (req, res) => {
         try {
-            let update = await req.mongoConnection.collection('users').updateOne(
-                {email: req.body.email},
-                { $set : {...req.body, adminUser: req.body.email == 'premkumar.231996@gmail.com'}},
-                {upsert: true}
-            )
-            let userData = await req.mongoConnection.collection('users').findOne({email: req.body.email});
-            console.log(update);
-            let Jwttoken = jwt.encode(userData, configFile.secretKey);
+            let { mobile, pin } = req.body;
+            let userData = await curdOperations.findOne(req.db, 'users', { mobileNumber: mobile, pin: pin });
             if (userData) {
-                res.status(200).send({ success: true, code: 200, data: userData, token: Jwttoken, message: 'success' })
+                let params = {};
+                params['where'] = { mobileNumber: mobile };
+                params['set'] = {
+                    tokenTime: new Date(),
+                    lastActiveTime: new Date()
+                };
+                let updateUser = await curdOperations.updateOne(req.db, params, 'users', false);
+                let latestUserData = await curdOperations.findOne(req.db, 'users', { mobileNumber: mobile });
+                const token = jwt.encode(latestUserData, secret);
+                res.status(200).send({ success: true, code: 200, firstTimeLogin: latestUserData.firstTimeLogin || false, token: 'JWT ' + token, userData: latestUserData, message: 'successfully Fectched userData.' });
             } else {
-                res.status(400).send({ success: false, code: 400, data: userData, message: 'something went wrong' })
+                res.status(404).send({ success: false, code: 404, error: 'user not found', message: 'user not found' })
             }
-            // res.status(200).send({success: true, code: 200, data: email, message: 'success'})
         } catch (err) {
-            console.log(err, 8787);
-            // await logErrors({mongoConnection: req.mongoConnection, err});
-            res.send({ success: false, code: 500, data: err, message: 'something went wrong' })
+            res.status(500).send({ success: false, code: 500, error: err, message: 'something went wrong' })
         }
     },
-    saveProfile: async (req, res) => {
-        try {
-            let update = await req.mongoConnection.collection('users').updateOne(
-                {email: req.body.email},
-                { $set : {profile: req.body, isMaker: true}},
-                {upsert: true}
-            )
-            if (update) {
-                res.status(200).send({ success: true, code: 200, data: update, message: 'success' })
-            } else {
-                res.status(400).send({ success: false, code: 400, data: update, message: 'something went wrong' })
-            }
-        } catch(err) {
-            console.log(err, 8787);
-            // await logErrors({mongoConnection: req.mongoConnection, err});
-            res.send({ success: false, code: 500, data: err, message: 'something went wrong' })
-        }
-    },
-    saveBankDetails: async (req, res) => {
-        try {
-            let update = await req.mongoConnection.collection('users').updateOne(
-                {email: req.body.email},
-                { $set : { ...req.body, draftDone: true}},
-                {upsert: true}
-            )
-            if (update) {
-                res.status(200).send({ success: true, code: 200, data: update, message: 'success' })
-            } else {
-                res.status(400).send({ success: false, code: 400, data: update, message: 'something went wrong' })
-            }
-        } catch(err) {
-            console.log(err, 8787);
-            // await logErrors({mongoConnection: req.mongoConnection, err});
-            res.send({ success: false, code: 500, data: err, message: 'something went wrong' })
-        }
-    },
-    getMakers: async (req, res) => {
-        try {
-            let match = {email: {$ne: 'premkumar.231996@gmail.com'}}
-            if (req.body.match == 'all') {
 
-            } else if (req.body.match == 'isMaker') {
-                match = { email: {$ne: 'premkumar.231996@gmail.com'}, draftDone: true}
-            } else if (req.body.match == 'draftDone') {
-                match = { email: {$ne: 'premkumar.231996@gmail.com'}, draftDone: {$exists: false}}
+    createCustomer: async (req, res) => {
+        try {
+            let { mobile, pin, role } = req.body;
+            let exists = await curdOperations.findOne(req.db, 'users', { mobileNumber: mobile });
+            if (!exists) {
+                let obj = {
+                    mobileNumber: mobile,
+                    pin: pin,
+                    primaryRole:'customer',
+                    role: 'customer',
+                    activeUser: true,
+                    firstTimeLogin: true,
+                    tokenTime: new Date(),
+                    lastActiveTime: new Date(),
+                }
+                let insertUser = await curdOperations.insertOne(req.db, 'users', obj);
+                let userData = await curdOperations.findOne(req.db, 'users', { mobileNumber: mobile });
+                const token = jwt.encode(userData, secret);
+                res.status(200).send({ success: true, code: 200, firstTimeLogin: userData.firstTimeLogin || false, token: 'JWT ' + token, userData: userData, message: 'successfully Fectched userData.' });
+            } else {
+                res.status(409).send({ success: false, code: 409, error: 'user already exists', message: 'user already exists' })
             }
-            console.log(req.body);
-            let list = await req.mongoConnection.collection('users').find(match).toArray();
-            res.status(200).send({ success: true, code: 200, data: list, message: 'success' })
-        } catch(err) {
-            console.log(err, 8787);
-            // await logErrors({mongoConnection: req.mongoConnection, err});
-            res.send({ success: false, code: 500, data: err, message: 'something went wrong' })
+        } catch (err) {
+            res.status(500).send({ success: false, code: 500, error: err, message: 'something went wrong' })
         }
     },
-    getMakerById: async (req, res) => {
-        try {
-            let data = await req.mongoConnection.collection('users').findOne({_id: req._id})
-            res.status(200).send({ success: true, code: 200, data: data, message: 'success' })
-        } catch(err) {
-            console.log(err, 8787);
-            // await logErrors({mongoConnection: req.mongoConnection, err});
-            res.send({ success: false, code: 500, data: err, message: 'something went wrong' })
-        }
-    }
 }
 
-module.exports = authController;
+module.exports = { authController };
