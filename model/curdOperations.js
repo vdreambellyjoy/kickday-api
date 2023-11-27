@@ -21,11 +21,10 @@ module.exports = {
         });
     },
 
-    findAll: async (db, collectionName, findObject, sortValue = -1, sortKey = '_id') => {
+    findOne: async (db, collectionName, findObject) => {
         return new Promise(async (resolve, reject) => {
             try {
-                let sortObj = { [sortKey]: sortValue }
-                let result = await db.collection(collectionName).find(findObject).sort(sortObj).toArray();
+                let result = await db.collection(collectionName).findOne(findObject);
                 resolve(result);
             } catch (error) {
                 reject(error);
@@ -33,10 +32,11 @@ module.exports = {
         });
     },
 
-    findOne: async (db, collectionName, findObject) => {
+    findAll: async (db, collectionName, findObject, sortValue = -1, sortKey = '_id') => {
         return new Promise(async (resolve, reject) => {
             try {
-                let result = await db.collection(collectionName).findOne(findObject);
+                let sortObj = { [sortKey]: sortValue }
+                let result = await db.collection(collectionName).find(findObject).sort(sortObj).toArray();
                 resolve(result);
             } catch (error) {
                 reject(error);
@@ -72,17 +72,6 @@ module.exports = {
         });
     },
 
-    removeRecord: async (db, collectionName, findObject) => {
-        return new Promise(async (resolve, reject) => {
-            try {
-                let data = await db.collection(collectionName).deleteMany(findObject);
-                resolve(data);
-            } catch (error) {
-                reject(error)
-            };
-        });
-    },
-
     deleteOne: async (db, collectionName, findObject) => {
         return new Promise(async (resolve, reject) => {
             try {
@@ -94,14 +83,37 @@ module.exports = {
         });
     },
 
-    countModel(conn, collection, match) {
+    deleteMany: async (db, collectionName, findObject) => {
         return new Promise(async (resolve, reject) => {
             try {
-                let result = await conn.collection(collection).count(match);
+                let data = await db.collection(collectionName).deleteMany(findObject);
+                resolve(data);
+            } catch (error) {
+                reject(error)
+            };
+        });
+    },
+
+    countModel(conn, collectionName, match) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                let result = await conn.collection(collectionName).count(match);
                 resolve(result);
             } catch (err) {
                 reject(err)
             };
         });
     },
+
+    aggregateQuery: (conn, collectionName, query) => {
+        return new Promise(async (resolve, reject) => {
+            try {
+                let result = await conn.collection(collectionName).aggregate(query).toArray();
+                resolve(result);
+            } catch (error) {
+                reject(false)
+            };
+        });
+    },
+
 }
