@@ -1,6 +1,6 @@
 const adminRoutes = require('express').Router()
 const { adminController } = require('../Controller/adminController');
-const saveImageToGridFS = require('../middlewares/uploadBase64Image')
+const saveImagesToGridFS = require('../middlewares/uploadBase64Image')
 
 
 adminRoutes.post('/getUsersCount', adminController.getUsersCount);
@@ -9,7 +9,8 @@ adminRoutes.post('/getAllUsersList', adminController.getAllUsersList);
 adminRoutes.post('/getUserBasedOnId', adminController.getUserBasedOnId);
 adminRoutes.post('/ActiveDeActiveUser', adminController.activeDeActiveUser);
 
-adminRoutes.post('/createMaker', saveImageToGridFS, adminController.createMaker);
+adminRoutes.post('/createMaker', saveImagesToGridFS, adminController.createMaker);
+adminRoutes.post('/updateKitchenImages', saveImagesToGridFS, adminController.updateKitchenImages);
 adminRoutes.post('/updateBankDetails', adminController.updateBankDetails);
 
 module.exports = { adminRoutes };

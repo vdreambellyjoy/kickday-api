@@ -44,6 +44,17 @@ module.exports = {
         });
     },
 
+    findOneAndUpdate: async (db, collectionName, findObject, updateObject, upsert, updatedDoc) => {
+        return new Promise(async (resolve, reject) => {
+            try {
+                let result = await db.collection(collectionName).findOneAndUpdate(findObject, { $inc: updateObject }, { upsert: upsert, returnNewDocument: updatedDoc });
+                resolve(result);
+            } catch (error) {
+                reject(error);
+            };
+        });
+    },
+
     updateOne: (conn, params, collection, upsert) => {
         return new Promise(async (resolve, reject) => {
             try {

@@ -1,10 +1,10 @@
 const customerRoutes = require('express').Router()
-const saveImageToGridFS = require('../middlewares/uploadBase64Image')
+const saveImagesToGridFS = require('../middlewares/uploadBase64Image')
 const { customerController } = require('../Controller/customerController');
 
 
-customerRoutes.post('/updateCustomerDetails',saveImageToGridFS, customerController.updateCustomerDetails);
-customerRoutes.post('/getAllListingsForCustomer',saveImageToGridFS, customerController.getAllListingsForCustomer);
+customerRoutes.post('/updateCustomerDetails',saveImagesToGridFS, customerController.updateCustomerDetails);
+customerRoutes.post('/getAllListingsForCustomer',saveImagesToGridFS, customerController.getAllListingsForCustomer);
 
 
 module.exports = { customerRoutes };

@@ -66,14 +66,18 @@ const adminController = {
             let { userName, email, mobile, city, bio } = req.body;
             let exists = await curdOperations.findOne(req.db, 'users', { mobileNumber: mobile });
             if (!exists) {
+                let orderCounter = await curdOperations.findOneAndUpdate(req.db, 'counters', { "name": "maker" }, { "seqValue": 1 }, true, true);
+                let userId = orderCounter.value.seqValue.toString().padStart(3, '0');
                 let obj = {
                     userName: userName,
+                    ID: userId,
                     mobileNumber: mobile,
                     email: email,
                     pin: '123456',
                     primaryRole: 'maker',
                     role: 'maker',
                     address: city,
+                    profileId: req.body.imageId,
                     bio: bio,
                     draft: true,
                     activeUser: true,
@@ -84,6 +88,19 @@ const adminController = {
             } else {
                 res.status(409).send({ success: false, code: 409, error: 'maker already exists', message: 'maker already exists' })
             }
+        } catch (err) {
+            res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
+        }
+    },
+
+    updateKitchenImages: async (req, res) => {
+        try {
+            let params = {};
+            params['where'] = { mobileNumber: req.body.mobile };
+            params['set'] = { kitchenImages: req.body.imageArray };
+            let updateUser = await curdOperations.updateOne(req.db, params, 'users', false);
+            let user = await curdOperations.findOne(req.db, 'users', params['where']);
+            res.status(200).send({ success: true, code: 200, data: user, message: 'successfully Fectched userData' });
         } catch (err) {
             res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
         }
