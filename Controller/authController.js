@@ -29,6 +29,18 @@ const authController = {
         }
     },
 
+    logOut: async (req, res) => {
+        try {
+            let params = {};
+            params['where'] = { _id: new ObjectId(req.user._id) };
+            params['set'] = { tokenTime: "", lastActiveTime: "" };
+            let updateUser = await curdOperations.updateOne(req.db, params, 'users', false);
+            res.status(200).send({ success: true, code: 200, message: 'successfully logout user.' });
+        } catch (err) {
+            res.status(500).send({ success: false, code: 500, error: err, message: 'something went wrong' })
+        }
+    },
+
     createCustomer: async (req, res) => {
         try {
             let { mobile, pin, role } = req.body;
@@ -37,7 +49,7 @@ const authController = {
                 let obj = {
                     mobileNumber: mobile,
                     pin: pin,
-                    primaryRole:'customer',
+                    primaryRole: 'customer',
                     role: 'customer',
                     activeUser: true,
                     firstTimeLogin: true,

@@ -3,7 +3,7 @@ const curdOperations = require("../model/curdOperations");
 const adminController = {
     getUsersCount: async (req, res) => {
         try {
-            let count = await curdOperations.countModel(req.db, 'users', { _id: { $ne: new ObjectId(req.user._id) } });
+            let count = await curdOperations.countModel(req.db, 'users', { _id: { $ne: new ObjectId(req.user._id) }, role: { $ne: 'admin' } });
             res.status(200).send({ success: true, code: 200, data: count, message: 'successfully Fectched user count.' });
         } catch (err) {
             res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
@@ -22,7 +22,7 @@ const adminController = {
     getAllUsersList: async (req, res) => {
         try {
             let { selectedTab } = req.body;
-            let match = { _id: { $ne: new ObjectId(req.user._id) } }
+            let match = { _id: { $ne: new ObjectId(req.user._id) }, role: { $ne: 'admin' } }
             if (selectedTab == 'maker' || selectedTab == 'customer') {
                 match = { ...match, role: selectedTab };
             }
