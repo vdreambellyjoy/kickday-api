@@ -2,6 +2,7 @@ const jwt = require('jwt-simple');
 const configFile = require('../config');
 const secret = configFile.secretKey
 const { ObjectId } = require('mongodb');
+const readfileFromGridFs = require('../middlewares/gridFsRead');
 const curdOperations = require('../model/curdOperations');
 
 
@@ -41,7 +42,7 @@ const authController = {
         }
     },
 
-    createCustomer: async (req, res) => {
+    registerCustomer: async (req, res) => {
         try {
             let { mobile, pin, role } = req.body;
             let exists = await curdOperations.findOne(req.db, 'users', { mobileNumber: mobile });
@@ -63,6 +64,16 @@ const authController = {
             } else {
                 res.status(409).send({ success: false, code: 409, error: 'user already exists', message: 'user already exists' })
             }
+        } catch (err) {
+            res.status(500).send({ success: false, code: 500, error: err, message: 'something went wrong' })
+        }
+    },
+
+    getlogofile: async (req, res) => {
+        try {
+            const { fileId } = { ...req.body };
+            const fileObject = await readfileFromGridFs(fileId,req.db);
+            res.json({ ...fileObject });
         } catch (err) {
             res.status(500).send({ success: false, code: 500, error: err, message: 'something went wrong' })
         }

@@ -4,7 +4,7 @@ const { customerController } = require('../Controller/customerController');
 
 
 customerRoutes.post('/updateCustomerDetails',saveImagesToGridFS, customerController.updateCustomerDetails);
-customerRoutes.post('/getAllListingsForCustomer',saveImagesToGridFS, customerController.getAllListingsForCustomer);
+customerRoutes.post('/getAllListingsForCustomer', customerController.getAllListingsForCustomer);
 
 
 module.exports = { customerRoutes };

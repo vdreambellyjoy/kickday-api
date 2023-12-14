@@ -27,10 +27,10 @@ const saveImagesToGridFS = (req, res, next) => {
     stream.write(binaryData);
     stream.end();
     stream.on('close', () => {
-      if (images.length == 1) { req.body.imageId = stream.id; next(); }
+      if (images.length == 1) { delete req.body.image; req.body.imageId = stream.id; next(); }
       else {
         imageIdArray.push(stream.id)
-        if (i + 1 == images.length) { req.body.imageArray = imageIdArray; next(); }
+        if (i + 1 == images.length) { delete req.body.image; req.body.imageArray = imageIdArray; next(); }
       }
     });
     stream.on('error', error => {
