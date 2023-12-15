@@ -63,30 +63,51 @@ const adminController = {
 
     createMaker: async (req, res) => {
         try {
-            let { userName, email, mobile, city, bio } = req.body;
-            let exists = await curdOperations.findOne(req.db, 'users', { mobileNumber: mobile });
-            if (!exists) {
-                let orderCounter = await curdOperations.findOneAndUpdate(req.db, 'counters', { "name": "maker" }, { "seqValue": 1 }, true, true);
-                let userId = orderCounter.value.seqValue.toString().padStart(3, '0');
-                let obj = {
-                    userName: userName,
-                    ID: userId,
-                    mobileNumber: mobile,
-                    email: email,
-                    pin: '123456',
-                    primaryRole: 'maker',
-                    role: 'maker',
-                    address: city,
-                    profileId: req.body.imageId,
-                    bio: bio,
-                    draft: true,
-                    activeUser: true,
-                };
-                let insertUser = await curdOperations.insertOne(req.db, 'users', obj);
-                let userData = await curdOperations.findOne(req.db, 'users', { mobileNumber: mobile });
-                res.status(200).send({ success: true, code: 200, data: userData, message: 'successfully Fectched makerData.' });
+            let { userName, email, mobile, city, bio, _id } = req.body;
+            if (!_id) {
+                let exists = await curdOperations.findOne(req.db, 'users', { mobileNumber: mobile });
+                if (!exists) {
+                    let orderCounter = await curdOperations.findOneAndUpdate(req.db, 'counters', { "name": "maker" }, { "seqValue": 1 }, true, true);
+                    let userId = orderCounter.value.seqValue.toString().padStart(3, '0');
+                    let obj = {
+                        userName: userName,
+                        ID: userId,
+                        mobileNumber: mobile,
+                        email: email,
+                        pin: '123456',
+                        primaryRole: 'maker',
+                        role: 'maker',
+                        address: city,
+                        profileId: req.body.imageId,
+                        bio: bio,
+                        draft: true,
+                        activeUser: true,
+                    };
+                    let insertUser = await curdOperations.insertOne(req.db, 'users', obj);
+                    let userData = await curdOperations.findOne(req.db, 'users', { mobileNumber: mobile });
+                    res.status(200).send({ success: true, code: 200, data: userData, message: 'successfully Fectched makerData.' });
+                } else {
+                    res.status(409).send({ success: false, code: 409, error: 'maker already exists', message: 'maker already exists' })
+                }
             } else {
-                res.status(409).send({ success: false, code: 409, error: 'maker already exists', message: 'maker already exists' })
+                let exists = await curdOperations.findOne(req.db, 'users', { _id: new ObjectId(_id) });
+                if (exists) {         
+                    let params = [];
+                    params['where'] = { _id: new ObjectId(_id) };
+                    params['set'] = {
+                        userName: userName,
+                        mobileNumber: mobile,
+                        email: email,
+                        address: city,
+                        profileId: req.body.imageId,
+                        bio: bio,
+                    }
+                    let updateUser = await curdOperations.updateOne(req.db, params, 'users', false);
+                    let userData = await curdOperations.findOne(req.db, 'users', { mobileNumber: mobile });
+                    res.status(200).send({ success: true, code: 200, data: userData, message: 'successfully Fectched makerData.' });
+                } else {
+                    res.status(404).send({ success: false, code: 409, error: 'maker not found', message: 'user not found' })
+                }
             }
         } catch (err) {
             res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
