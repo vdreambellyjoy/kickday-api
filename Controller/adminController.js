@@ -10,10 +10,29 @@ const adminController = {
         }
     },
 
-    getOrdersCount: async (req, res) => {
+    getListingsCount: async (req, res) => {
         try {
-            let count = await curdOperations.countModel(req.db, 'orders', {});
+            let count = await curdOperations.countModel(req.db, 'listings', {});
             res.status(200).send({ success: true, code: 200, data: count, message: 'successfully Fectched Orders count.' });
+        } catch (err) {
+            res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
+        }
+    },
+
+    getAllListings: async (req, res) => {
+        try {
+            let query = [
+                {
+                    $lookup: {
+                        from: "listingOrders",
+                        localField: "_id",
+                        foreignField: "refListingId",
+                        as: "listingOrders"
+                    }
+                }
+            ];
+            let result = await curdOperations.aggregateQuery(req.db, 'listings', query);
+            res.status(200).send({ success: true, code: 200, list: result, message: 'successfully Fectched list.' });
         } catch (err) {
             res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
         }

@@ -4,7 +4,9 @@ const saveImagesToGridFS = require('../middlewares/uploadBase64Image')
 
 
 adminRoutes.post('/getUsersCount', adminController.getUsersCount);
-adminRoutes.post('/getOrdersCount', adminController.getOrdersCount);
+adminRoutes.post('/getListingsCount', adminController.getListingsCount);
+
+adminRoutes.post('/getAllListings', adminController.getAllListings);
 adminRoutes.post('/getAllUsersList', adminController.getAllUsersList);
 adminRoutes.post('/getUserBasedOnId', adminController.getUserBasedOnId);
 adminRoutes.post('/ActiveDeActiveUser', adminController.activeDeActiveUser);
