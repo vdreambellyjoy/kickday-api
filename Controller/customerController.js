@@ -31,6 +31,20 @@ const customerController = {
                         foreignField: "refListingId",
                         as: "listingOrders"
                     }
+                },
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "makerId",
+                        foreignField: "_id",
+                        as: "makerData"
+                    }
+                },
+                { $unwind: '$makerData' },
+                {
+                    $project: {
+                        "makerData.kitchenImages": 0
+                    }
                 }
             ];
             let result = await curdOperations.aggregateQuery(req.db, 'listings', query);

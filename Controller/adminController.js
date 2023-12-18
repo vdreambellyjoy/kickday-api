@@ -82,7 +82,7 @@ const adminController = {
 
     createMaker: async (req, res) => {
         try {
-            let { userName, email, mobile, city, bio, _id } = req.body;
+            let { userName, email, mobile, city, bio, _id, imageId } = req.body;
             if (!_id) {
                 let exists = await curdOperations.findOne(req.db, 'users', { mobileNumber: mobile });
                 if (!exists) {
@@ -97,7 +97,7 @@ const adminController = {
                         primaryRole: 'maker',
                         role: 'maker',
                         address: city,
-                        profileId: req.body.imageId,
+                        profileId: imageId,
                         bio: bio,
                         draft: true,
                         activeUser: true,
@@ -106,11 +106,14 @@ const adminController = {
                     let userData = await curdOperations.findOne(req.db, 'users', { mobileNumber: mobile });
                     res.status(200).send({ success: true, code: 200, data: userData, message: 'successfully Fectched makerData.' });
                 } else {
+                    if (imageId) {
+                        console.log('remove before sending')
+                    }
                     res.status(409).send({ success: false, code: 409, error: 'maker already exists', message: 'maker already exists' })
                 }
             } else {
                 let exists = await curdOperations.findOne(req.db, 'users', { _id: new ObjectId(_id) });
-                if (exists) {         
+                if (exists) {
                     let params = [];
                     params['where'] = { _id: new ObjectId(_id) };
                     params['set'] = {
@@ -136,11 +139,10 @@ const adminController = {
     updateKitchenImages: async (req, res) => {
         try {
             let params = {};
-            params['where'] = { mobileNumber: req.body.mobile };
+            params['where'] = { mobileNumber: req.body.mobileNumber };
             params['set'] = { kitchenImages: req.body.imageArray };
             let updateUser = await curdOperations.updateOne(req.db, params, 'users', false);
-            let user = await curdOperations.findOne(req.db, 'users', params['where']);
-            res.status(200).send({ success: true, code: 200, data: user, message: 'successfully Fectched userData' });
+            res.status(200).send({ success: true, code: 200, data: {}, message: 'successfully Fectched userData' });
         } catch (err) {
             res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
         }
@@ -148,7 +150,7 @@ const adminController = {
 
     updateBankDetails: async (req, res) => {
         try {
-            let { _id, userName, email, mobile, city, bio, commission, accountName, accountNumber, accountType, bankName, ifscCode } = req.body;
+            let { _id, userName, email, mobile, city, bio, commission, accountName, branch, accountNumber, accountType, bankName, ifscCode } = req.body;
             if (_id) {
                 let params = {};
                 params['where'] = { _id: new ObjectId(_id) };
@@ -162,10 +164,11 @@ const adminController = {
                     userName: userName,
                     address: city,
                     bio,
-                    commission, accountName, accountNumber, accountType, bankName, ifscCode
+                    commission, accountName, accountNumber, accountType, bankName, ifscCode, branch
                 };
                 let updateUser = await curdOperations.updateOne(req.db, params, 'users', false);
-                res.status(200).send({ success: true, code: 200, data: {}, message: 'successfully Fectched makerData.' });
+                let userData = await curdOperations.findOne(req.db, 'users', { _id: new ObjectId(_id) });
+                res.status(200).send({ success: true, code: 200, data: userData, message: 'successfully Fectched makerData.' });
             } else {
                 res.status(404).send({ success: false, code: 404, error: 'user not found', message: 'user not found' })
             }
