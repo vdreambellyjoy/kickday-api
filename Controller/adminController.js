@@ -1,5 +1,7 @@
 const { ObjectId } = require("mongodb");
 const curdOperations = require("../model/curdOperations");
+const removeFileFromGridfs = require('../middlewares/gridFsRemoveFile');
+
 const adminController = {
     getUsersCount: async (req, res) => {
         try {
@@ -21,18 +23,53 @@ const adminController = {
 
     getAllListings: async (req, res) => {
         try {
-            let query = [
+            let query = [];
+            if (req.user.role != 'admin') query.push({ refMakerId: new ObjectId(req.user._id) })
+            query = [
                 {
                     $lookup: {
-                        from: "listingOrders",
+                        from: "orders",
                         localField: "_id",
-                        foreignField: "refListingId",
-                        as: "listingOrders"
+                        foreignField: "refOrderId",
+                        as: "customerOrders"
                     }
-                }
+                },
+                { $addFields: { customerOrdersCount: { $size: '$customerOrders' }, customerOrders: "$$REMOVE" } }
             ];
             let result = await curdOperations.aggregateQuery(req.db, 'listings', query);
             res.status(200).send({ success: true, code: 200, list: result, message: 'successfully Fectched list.' });
+        } catch (err) {
+            res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
+        }
+    },
+
+    getListingBasedOnId: async (req, res) => {
+        try {
+            let _id = new ObjectId(req.body._id);
+            let query = [
+                { $match: { _id: _id } },
+                {
+                    $lookup: {
+                        from: "orders",
+                        localField: "_id",
+                        foreignField: "refOrderId",
+                        as: "customerOrders"
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "refMakerId",
+                        foreignField: "_id",
+                        as: "makerData"
+                    }
+                },
+                { $unwind: '$makerData' },
+                { $addFields: { customerOrdersCount: { $size: '$customerOrders' } } }
+            ];
+            let result = await curdOperations.aggregateQuery(req.db, 'listings', query);
+            let resultCopy = result.length ? result[0] : {};
+            res.status(200).send({ success: true, code: 200, data: resultCopy, message: 'successfully Fectched listingData.' });
         } catch (err) {
             res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
         }
@@ -62,6 +99,44 @@ const adminController = {
         try {
             let user = await curdOperations.findOne(req.db, 'users', { _id: new ObjectId(req.body._id) });
             res.status(200).send({ success: true, code: 200, data: user, message: 'successfully Fectched userData' });
+        } catch (err) {
+            res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
+        }
+    },
+
+    getUserOverView: async (req, res) => {
+        try {
+            let _id = new ObjectId(req.body._id);
+            let query = [
+                { $match: { _id: _id } },
+                {
+                    $lookup: {
+                        from: "listings",
+                        localField: "refMakerId",
+                        foreignField: "_id",
+                        as: "listingsData"
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "orders",
+                        localField: "refMakerId",
+                        foreignField: "_id",
+                        as: "customerOrders"
+                    }
+                },
+                {
+                    $addFields:{
+                        listingsCount:{$size:'$listingsData'},
+                        customerOrdersCount:{$size:'$customerOrders'},
+                        listingsData:'$$REMOVE',
+                        customerOrders:'$$REMOVE',
+                    }
+                }
+            ];
+            let result = await curdOperations.aggregateQuery(req.db, 'users', query);
+            let resultCopy = result.length ? result[0] : {};
+            res.status(200).send({ success: true, code: 200, data: resultCopy, message: 'successfully Fectched listingData.' });
         } catch (err) {
             res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
         }
@@ -106,9 +181,7 @@ const adminController = {
                     let userData = await curdOperations.findOne(req.db, 'users', { mobileNumber: mobile });
                     res.status(200).send({ success: true, code: 200, data: userData, message: 'successfully Fectched makerData.' });
                 } else {
-                    if (imageId) {
-                        console.log('remove before sending')
-                    }
+                    if (imageId) removeFileFromGridfs(imageId, req.db).catch(err => { });
                     res.status(409).send({ success: false, code: 409, error: 'maker already exists', message: 'maker already exists' })
                 }
             } else {
@@ -142,7 +215,8 @@ const adminController = {
             params['where'] = { mobileNumber: req.body.mobileNumber };
             params['set'] = { kitchenImages: req.body.imageArray };
             let updateUser = await curdOperations.updateOne(req.db, params, 'users', false);
-            res.status(200).send({ success: true, code: 200, data: {}, message: 'successfully Fectched userData' });
+            let userData = await curdOperations.findOne(req.db, 'users', { _id: new ObjectId(req.body._id) });
+            res.status(200).send({ success: true, code: 200, data: userData, message: 'successfully Fectched makerData.' });
         } catch (err) {
             res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
         }

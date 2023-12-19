@@ -20,7 +20,7 @@ module.exports = commonMiddlewares = {
                 }
                 let userData = await curdOperations.findOne(req.db, 'users', { _id: new ObjectId(decoded._id) });
                 if (decoded && decoded.hasOwnProperty('tokenTime') && userData.tokenTime?.toString() == new Date(decoded.tokenTime)) {
-                    req.user = decoded;
+                    req.user = userData;
                     next();
                 } else {
                     return res.status(401).send({ success: false, message: 'token Expired', error: 'tokenError' });
