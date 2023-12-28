@@ -58,6 +58,14 @@ const adminController = {
                 },
                 {
                     $lookup: {
+                        from: "listingOrders",
+                        localField: "_id",
+                        foreignField: "refListingId",
+                        as: "listingOrders"
+                    }
+                },
+                {
+                    $lookup: {
                         from: "users",
                         localField: "refMakerId",
                         foreignField: "_id",
@@ -126,11 +134,11 @@ const adminController = {
                     }
                 },
                 {
-                    $addFields:{
-                        listingsCount:{$size:'$listingsData'},
-                        customerOrdersCount:{$size:'$customerOrders'},
-                        listingsData:'$$REMOVE',
-                        customerOrders:'$$REMOVE',
+                    $addFields: {
+                        listingsCount: { $size: '$listingsData' },
+                        customerOrdersCount: { $size: '$customerOrders' },
+                        listingsData: '$$REMOVE',
+                        customerOrders: '$$REMOVE',
                     }
                 }
             ];
@@ -157,7 +165,7 @@ const adminController = {
 
     createMaker: async (req, res) => {
         try {
-            let { userName, email, mobile, city, bio, _id, imageId } = req.body;
+            let { userName, email, mobile, pin, city, bio, _id, imageId } = req.body;
             if (!_id) {
                 let exists = await curdOperations.findOne(req.db, 'users', { mobileNumber: mobile });
                 if (!exists) {
@@ -168,7 +176,7 @@ const adminController = {
                         ID: userId,
                         mobileNumber: mobile,
                         email: email,
-                        pin: '123456',
+                        pin: pin,
                         primaryRole: 'maker',
                         role: 'maker',
                         address: city,
