@@ -9,6 +9,11 @@ customerRoutes.post('/getAllListingsForCustomer', customerController.getAllListi
 customerRoutes.post('/setFavItem', customerController.setFavItem);
 customerRoutes.post('/setUnFavItem', customerController.setUnFavItem);
 customerRoutes.post('/getListingForUser', customerController.getListingForUser);
+customerRoutes.post('/addCustomerAddress', customerController.addCustomerAddress);
+customerRoutes.post('/getCustomerAddress', customerController.getCustomerAddress);
+customerRoutes.post('/setDefaultAddress', customerController.setDefaultAddress);
+customerRoutes.post('/deleteAddress', customerController.deleteAddress);
+customerRoutes.post('/addToCart', customerController.addToCart);
 
 
 module.exports = { customerRoutes };

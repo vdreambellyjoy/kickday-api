@@ -10,24 +10,38 @@ const makerController = {
         }
     },
 
-    addListing: async (req, res) => {
+    addEditListing: async (req, res) => {
         try {
-            let { orders } = { ...req.body };
+            let { orders, _id } = { ...req.body };
             req.body.refMakerId = new ObjectId(req.user._id);
             req.body.startDateTime = new Date(req.body.startDateTime);
             req.body.endDateTime = new Date(req.body.endDateTime);
-            let orderCounter = await curdOperations.findOneAndUpdate(req.db, 'counters', { "name": "listing" }, { "seqValue": 1 }, true, true);
-            let userId = orderCounter.value.seqValue.toString().padStart(3, '0');
-            req.body.ID = `${orderCounter.value.prefix} ${userId}`;
-            console.log(req.body.ID)
             delete req.body.orders;
-            let newDoc = await curdOperations.insertOne(req.db, 'listings', req.body);
-            for (let order of orders) {
-                order.refListingId = newDoc.insertedId;
-                order.refMakerId = new ObjectId(req.user._id);
+            if (!ObjectId.isValid(_id)) {
+                let orderCounter = await curdOperations.findOneAndUpdate(req.db, 'counters', { "name": "listing" }, { "seqValue": 1 }, true, true);
+                let userId = orderCounter.value.seqValue.toString().padStart(3, '0');
+                req.body.ID = `${orderCounter.value.prefix} ${userId}`;
+                let newDoc = await curdOperations.insertOne(req.db, 'listings', req.body);
+                for (let order of orders) {
+                    order.refListingId = newDoc.insertedId;
+                    order.refMakerId = new ObjectId(req.user._id);
+                }
+                let insertDocs = await curdOperations.insertMany(req.db, 'listingOrders', orders);
+                res.status(200).send({ success: true, code: 200, data: {}, message: 'successfully added Listing.' });
+            } else {
+                let deleteDoc = await curdOperations.deleteMany(req.db, 'listingOrders', { refListingId: new ObjectId(_id) });
+                for (let order of orders) {
+                    order.refListingId = new ObjectId(_id);
+                    order.refMakerId = new ObjectId(req.user._id);
+                }
+                let insertDocs = await curdOperations.insertMany(req.db, 'listingOrders', orders);
+                delete req.body._id;
+                let params = {};
+                params['where'] = { _id: new ObjectId(_id) };
+                params['set'] = req.body
+                let updateUser = await curdOperations.updateOne(req.db, params, 'listings', false);
+                res.status(200).send({ success: true, code: 200, data: {}, message: 'successfully updated Listing.' });
             }
-            let insertDocs = await curdOperations.insertMany(req.db, 'listingOrders', orders);
-            res.status(200).send({ success: true, code: 200, data: {}, message: 'successfully added Listing.' });
         } catch (err) {
             res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
         }
