@@ -55,10 +55,10 @@ module.exports = {
         });
     },
 
-    updateOne: (conn, params, collection, upsert) => {
+    updateOne: (db, params, collectionName, upsert) => {
         return new Promise(async (resolve, reject) => {
             try {
-                let result = await conn.collection(collection).updateOne(
+                let result = await db.collection(collectionName).updateOne(
                     params['where'], { $set: params['set'] }, { upsert: upsert }
                 );
                 resolve(result);
@@ -83,6 +83,21 @@ module.exports = {
         });
     },
 
+    bulkUpdateModel: (db, collectionName, data) => {
+        return new Promise(async (resolve, reject) => {
+            try {
+                let insertData = true
+                if (data.length) {
+                    insertData = await db.collection(collectionName).bulkWrite(data);
+                }
+                resolve(insertData);
+            } catch (err) {
+                reject(err);
+            };
+        });
+    },
+
+
     deleteOne: async (db, collectionName, findObject) => {
         return new Promise(async (resolve, reject) => {
             try {
@@ -105,10 +120,10 @@ module.exports = {
         });
     },
 
-    countModel(conn, collectionName, match) {
+    countModel(db, collectionName, match) {
         return new Promise(async (resolve, reject) => {
             try {
-                let result = await conn.collection(collectionName).count(match);
+                let result = await db.collection(collectionName).count(match);
                 resolve(result);
             } catch (err) {
                 reject(err)
@@ -116,10 +131,10 @@ module.exports = {
         });
     },
 
-    aggregateQuery: (conn, collectionName, query) => {
+    aggregateQuery: (db, collectionName, query) => {
         return new Promise(async (resolve, reject) => {
             try {
-                let result = await conn.collection(collectionName).aggregate(query).toArray();
+                let result = await db.collection(collectionName).aggregate(query).toArray();
                 resolve(result);
             } catch (error) {
                 reject(false)

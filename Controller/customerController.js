@@ -48,7 +48,47 @@ const customerController = {
                 }
             ];
             let result = await curdOperations.aggregateQuery(req.db, 'listings', query);
-            res.status(200).send({ success: true, code: 200, list: result, message: 'successfully Fectched list.' });
+            res.status(200).send({ success: true, code: 200, data: result, message: 'successfully Fectched list.' });
+        } catch (err) {
+            res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
+        }
+    },
+
+    getCustomerOrders: async (req, res) => {
+        try {
+            let query = [
+                { $match: { refCustomerId: new ObjectId(req.user._id) } },
+                { $sort: { _id: -1 } },
+                {
+                    $lookup: {
+                        from: "listingOrders",
+                        localField: "_id",
+                        foreignField: "refListingId",
+                        as: "listingOrders"
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "refMakerId",
+                        foreignField: "_id",
+                        as: "makerData"
+                    }
+                },
+                {
+                    $unwind: {
+                        path: "$makerData", preserveNullAndEmptyArrays: true
+
+                    }
+                },
+                {
+                    $project: {
+                        "makerData.kitchenImages": 0
+                    }
+                }
+            ];
+            let result = await curdOperations.aggregateQuery(req.db, 'orders', query);
+            res.status(200).send({ success: true, code: 200, data: result, message: 'successfully Fectched list.' });
         } catch (err) {
             res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
         }
@@ -223,12 +263,99 @@ const customerController = {
     addToCart: async (req, res) => {
         try {
             let obj = {
+                ...req.body,
                 refCustomerId: new ObjectId(req.user._id),
-                ...req.body
+                refListingId: new ObjectId(req.body.refListingId),
+                refMakerId: new ObjectId(req.body.refMakerId),
             }
             let insertDoc = await curdOperations.insertOne(req.db, 'ordersTemp', obj);
-            res.status(200).send({ success: true, code: 200, data: {}, message: 'successfully added to cart.' });
+            res.status(200).send({ success: true, code: 200, _id: insertDoc.insertedId, message: 'successfully added to cart.' });
         } catch (err) {
+            res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
+        }
+    },
+
+    getCustomerOrderSummary: async (req, res) => {
+        try {
+            let query = [
+                {
+                    $match: {
+                        _id: new ObjectId(req.body._id),
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "refMakerId",
+                        foreignField: "_id",
+                        as: "makerData"
+                    }
+                },
+                {
+                    $unwind: {
+                        path: "$makerData", preserveNullAndEmptyArrays: true
+
+                    }
+                },
+                {
+                    $project: {
+                        "makerData.kitchenImages": 0
+                    }
+                }
+            ];
+            let result = await curdOperations.aggregateQuery(req.db, 'ordersTemp', query);
+            res.status(200).send({ success: true, code: 200, data: result[0], message: 'successfully Fectched order summary.' });
+        } catch (err) {
+            res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
+        }
+    },
+
+    placeOrder: async (req, res) => {
+        try {
+            let _id = new ObjectId(req.body._id);
+            let cartData = await curdOperations.findOne(req.db, 'ordersTemp', { _id });
+            let bulkUpdate = [];
+            if (cartData) {
+                let orderedItems = cartData.orderedItems.map(e => new ObjectId(e._id));
+                let availableOrders = await curdOperations.findAll(req.db, 'listingOrders', { _id: { $in: orderedItems } });
+                let quantitiesValid = true;
+                let finalPrice = 0;
+
+                cartData.orderedItems.forEach((orderedItem) => {
+                    const correspondingDBItem = availableOrders.find((item) => item._id.toString() == orderedItem._id.toString());
+                    if (correspondingDBItem) {
+                        if (parseInt(orderedItem.count) > parseInt(correspondingDBItem.quantity)) quantitiesValid = false;
+                        else { finalPrice = finalPrice + (+correspondingDBItem.price * orderedItem.count) }
+                    } else quantitiesValid = false;
+                    bulkUpdate.push({
+                        updateOne: {
+                            filter: { _id: new ObjectId(orderedItem._id) },
+                            update: { $inc: { quantity: -orderedItem.count } }
+                        }
+                    })
+                });
+                if (!quantitiesValid) {
+                    res.status(410).send({ success: false, code: 410, error: 'out of stock', message: 'something went wrong' })
+                } else {
+                    let orderCounter = await curdOperations.findOneAndUpdate(req.db, 'counters', { "name": "order" }, { "seqValue": 1 }, true, true);
+                    let ID = orderCounter.value.seqValue.toString().padStart(3, '0');
+                    cartData.ID = `${orderCounter.value.prefix}${ID}`;
+                    cartData.price = cartData.finalCostWithOutDeliveryOption;
+                    cartData.finalPrice = finalPrice;
+                    cartData.deliveryCharge = +cartData.deliveryOption?.price || 0;
+                    cartData.totalPrice = (+cartData.price) + (+cartData.deliveryCharge);
+                    cartData.status = 'Pending';
+                    delete cartData.finalCostWithOutDeliveryOption;
+                    let bulkWrite = await curdOperations.bulkUpdateModel(req.db, 'listingOrders', bulkUpdate);
+                    let insertDoc = await curdOperations.insertOne(req.db, 'orders', cartData);
+                    let result = await curdOperations.deleteOne(req.db, 'ordersTemp', { _id: _id });
+                    res.status(200).send({ success: true, code: 200, insertedId: insertDoc.insertedId, message: 'successfully placed order.' });
+                }
+            } else {
+                res.status(404).send({ success: false, code: 404, error: 'cart data not found', message: 'something went wrong' })
+            }
+        } catch (err) {
+            console.log(err)
             res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
         }
     },
