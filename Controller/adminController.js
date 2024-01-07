@@ -52,7 +52,7 @@ const adminController = {
                     $lookup: {
                         from: "orders",
                         localField: "_id",
-                        foreignField: "refOrderId",
+                        foreignField: "refListingId",
                         as: "customerOrders"
                     }
                 },
