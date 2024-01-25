@@ -60,6 +60,18 @@ const makerController = {
         }
     },
 
+    changeOrderStatus: async (req, res) => {
+        try {
+            let _id = new ObjectId(req.body._id);
+            let params = [];
+            params['where'] = { _id: _id };
+            params['set'] = { status: req.body.status };
+            let updateUser = await curdOperations.updateOne(req.db, params, 'orders', true);
+            res.status(200).send({ success: true, code: 200, data: {}, message: 'successfully updated orderStatus.' });
+        } catch (err) {
+            res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
+        }
+    },
 }
 
 module.exports = { makerController };
