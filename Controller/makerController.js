@@ -14,19 +14,21 @@ const makerController = {
         try {
             let { orders, _id } = { ...req.body };
             req.body.refMakerId = new ObjectId(req.user._id);
-            req.body.startDateTime = new Date(req.body.startDateTime);
-            req.body.endDateTime = new Date(req.body.endDateTime);
+            req.body.orderEndsOn = new Date(new Date(req.body.orderEndsOn).setHours(23, 59, 59));
+            req.body.orderDeliveredOn = new Date(new Date(req.body.orderDeliveredOn).setHours(23, 59, 59));
             delete req.body.orders;
             if (!ObjectId.isValid(_id)) {
                 let orderCounter = await curdOperations.findOneAndUpdate(req.db, 'counters', { "name": "listing" }, { "seqValue": 1 }, true, true);
                 let userId = orderCounter.value.seqValue.toString().padStart(3, '0');
-                req.body.ID = `${orderCounter.value.prefix}${userId}`;
+                req.body.ID = `KICK${userId}`;
                 let newDoc = await curdOperations.insertOne(req.db, 'listings', req.body);
-                for (let order of orders) {
-                    order.refListingId = newDoc.insertedId;
-                    order.refMakerId = new ObjectId(req.user._id);
-                    orders.quantity = +orders.quantity
-                }
+                orders = orders.map(e => {
+                    e.refListingId = newDoc.insertedId;
+                    e.refMakerId = new ObjectId(req.user._id);
+                    e.quantity = +e.quantity;
+                    e.price = +e.price;
+                    return e;
+                })
                 let insertDocs = await curdOperations.insertMany(req.db, 'listingOrders', orders);
                 res.status(200).send({ success: true, code: 200, data: {}, message: 'successfully added Listing.' });
             } else {

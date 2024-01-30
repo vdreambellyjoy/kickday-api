@@ -173,7 +173,7 @@ const adminController = {
                     let userId = orderCounter.value.seqValue.toString().padStart(3, '0');
                     let obj = {
                         userName: userName,
-                        ID: `${orderCounter.value.prefix}${userId}`,
+                        ID: `KICK${userId}`,
                         mobileNumber: mobile,
                         email: email,
                         pin: pin,

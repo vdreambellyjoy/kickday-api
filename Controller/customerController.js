@@ -56,15 +56,37 @@ const customerController = {
 
     getCustomerOrders: async (req, res) => {
         try {
+            let val = req.body.value || "All";
+            let matchObj = { status: { $ne: "" } };
+            if (val == "Delivered") {
+                matchObj = { status: "Delivered" };
+            }
+            if (val == "Cancelled") {
+                matchObj = { status: "Cancelled" };
+            }
+            if (val == "Favourite") {
+                matchObj = { favourite: true };
+            }
+            if (val == "Live") {
+                matchObj = { status: { $in: ["Pending", "Confirmed", "Dispatched"] } };
+            }
+            let firstMatch = { refCustomerId: new ObjectId(req.user._id) };
+            if (req.body._id) firstMatch = { _id: new ObjectId(req.body._id) };
             let query = [
-                { $match: { refCustomerId: new ObjectId(req.user._id) } },
+                { $match: firstMatch },
                 { $sort: { _id: -1 } },
                 {
                     $lookup: {
-                        from: "listingOrders",
-                        localField: "_id",
-                        foreignField: "refListingId",
-                        as: "listingOrders"
+                        from: "listings",
+                        localField: "refListingId",
+                        foreignField: "_id",
+                        as: "listingData"
+                    }
+                },
+                {
+                    $unwind: {
+                        path: "$listingData", preserveNullAndEmptyArrays: true
+
                     }
                 },
                 {
@@ -85,11 +107,46 @@ const customerController = {
                     $project: {
                         "makerData.kitchenImages": 0
                     }
-                }
+                },
+                {
+                    "$lookup": {
+                        "from": "favourites",
+                        "as": "favourites",
+                        "let": {
+                            "refUserId": new ObjectId(req.user._id),
+                            "refListingId": "$refListingId",
+                            "favourite": true
+                        },
+                        "pipeline": [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $and: [
+                                            { $eq: ["$refUserId", "$$refUserId"] },
+                                            { $eq: ["$refListingId", "$$refListingId"] },
+                                            { $eq: ["$favourite", "$$favourite"] },
+                                        ]
+                                    },
+                                }
+                            },
+                            {
+                                "$limit": 1
+                            }
+                        ]
+                    }
+                },
+                {
+                    $addFields: {
+                        favourite: { $arrayElemAt: ["$favourites.favourite", 0] },
+                        favourites: '$$REMOVE',
+                    }
+                },
+                { $match: matchObj }
             ];
             let result = await curdOperations.aggregateQuery(req.db, 'orders', query);
             res.status(200).send({ success: true, code: 200, data: result, message: 'successfully Fectched list.' });
         } catch (err) {
+            console.log(err);
             res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
         }
     },
@@ -176,28 +233,8 @@ const customerController = {
                     }
                 },
                 {
-                    $lookup: {
-                        from: "customerAddress",
-                        as: "customerAddress",
-                        let: { refCustomerId: new ObjectId(req.user._id), default: true },
-                        pipeline: [
-                            {
-                                $match: {
-                                    $expr: {
-                                        $and: [
-                                            { $eq: ["$refCustomerId", "$$refCustomerId"] },
-                                            { $eq: ["$default", "$$default"] },
-                                        ]
-                                    },
-                                }
-                            }
-                        ]
-                    }
-                },
-                {
                     $addFields: {
                         favourite: { $arrayElemAt: ["$favourites.favourite", 0] },
-                        customerAddress: { $arrayElemAt: ["$customerAddress", 0] },
                         favourites: '$$REMOVE',
                     }
                 },
@@ -267,7 +304,15 @@ const customerController = {
                 refCustomerId: new ObjectId(req.user._id),
                 refListingId: new ObjectId(req.body.refListingId),
                 refMakerId: new ObjectId(req.body.refMakerId),
-            }
+            };
+            obj.orderedItems = obj.orderedItems.map(e => {
+                e._id = new ObjectId(e._id);
+                e.price = +e.price;
+                e.quantity = +e.quantity;
+                delete e.refListingId;
+                delete e.refMakerId;
+                return e;
+            })
             let insertDoc = await curdOperations.insertOne(req.db, 'ordersTemp', obj);
             res.status(200).send({ success: true, code: 200, _id: insertDoc.insertedId, message: 'successfully added to cart.' });
         } catch (err) {
@@ -315,7 +360,7 @@ const customerController = {
             let _id = new ObjectId(req.body._id);
             let cartData = await curdOperations.findOne(req.db, 'ordersTemp', { _id });
             let bulkUpdate = [];
-            if (cartData) {
+            if (cartData && req.body.deliveryAddress) {
                 let orderedItems = cartData.orderedItems.map(e => new ObjectId(e._id));
                 let availableOrders = await curdOperations.findAll(req.db, 'listingOrders', { _id: { $in: orderedItems } });
                 let quantitiesValid = true;
@@ -339,12 +384,13 @@ const customerController = {
                 } else {
                     let orderCounter = await curdOperations.findOneAndUpdate(req.db, 'counters', { "name": "order" }, { "seqValue": 1 }, true, true);
                     let ID = orderCounter.value.seqValue.toString().padStart(3, '0');
-                    cartData.ID = `${orderCounter.value.prefix}${ID}`;
+                    cartData.ID = `KICK${ID}`;
                     cartData.price = cartData.finalCostWithOutDeliveryOption;
                     cartData.finalPrice = finalPrice;
                     cartData.deliveryCharge = +cartData.deliveryOption?.price || 0;
                     cartData.totalPrice = (+cartData.price) + (+cartData.deliveryCharge);
                     cartData.status = 'Pending';
+                    cartData.deliveryAddress = req.body.deliveryAddress;
                     delete cartData.finalCostWithOutDeliveryOption;
                     let bulkWrite = await curdOperations.bulkUpdateModel(req.db, 'listingOrders', bulkUpdate);
                     let insertDoc = await curdOperations.insertOne(req.db, 'orders', cartData);
@@ -352,7 +398,7 @@ const customerController = {
                     res.status(200).send({ success: true, code: 200, insertedId: insertDoc.insertedId, message: 'successfully placed order.' });
                 }
             } else {
-                res.status(404).send({ success: false, code: 404, error: 'cart data not found', message: 'something went wrong' })
+                res.status(404).send({ success: false, code: 404, error: 'cart data/deliveryAddress not found', message: 'something went wrong' })
             }
         } catch (err) {
             console.log(err)

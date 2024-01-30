@@ -137,7 +137,7 @@ module.exports = {
                 let result = await db.collection(collectionName).aggregate(query).toArray();
                 resolve(result);
             } catch (error) {
-                reject(false)
+                reject(error)
             };
         });
     },
