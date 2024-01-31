@@ -67,7 +67,7 @@ const makerController = {
             let _id = new ObjectId(req.body._id);
             let params = [];
             params['where'] = { _id: _id };
-            params['set'] = { status: req.body.status };
+            params['set'] = { status: req.body.status, timeStamp: new Date() };
             let updateUser = await curdOperations.updateOne(req.db, params, 'orders', true);
             res.status(200).send({ success: true, code: 200, data: {}, message: 'successfully updated orderStatus.' });
         } catch (err) {

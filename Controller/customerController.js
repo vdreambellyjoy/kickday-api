@@ -47,7 +47,75 @@ const customerController = {
                     }
                 }
             ];
-            let result = await curdOperations.aggregateQuery(req.db, 'listings', query);
+            let finalQuery = [];
+            let match = {};
+            if (req.body.search) {
+                match = {
+                    ...match,
+                    "address": { "$regex": req.body.search, "$options": "i" },
+                }
+            }
+            if (req.body.deliveryType) {
+                match = {
+                    ...match,
+                    "deliveryOptions": { "$elemMatch": { "type": req.body.deliveryType } },
+                }
+            }
+            if (req.body.deliveryDate) {
+                if (req.body.deliveryDate == "Available Today") {
+                    let today = new Date();
+                    let startOfDay = new Date(today);
+                    startOfDay.setHours(0, 0, 0, 0);
+                    let endOfDay = new Date(today);
+                    endOfDay.setHours(23, 59, 59, 999);
+                    match = {
+                        ...match,
+                        "timeStamp": { "$gte": startOfDay, "$lte": endOfDay }
+                    }
+                }
+                else if (req.body.deliveryDate == "Available Tomorrow") {
+                    let tomorrow = new Date();
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    let startOfTomorrow = new Date(tomorrow);
+                    startOfTomorrow.setHours(0, 0, 0, 0);
+                    let endOfTomorrow = new Date(tomorrow);
+                    endOfTomorrow.setHours(23, 59, 59, 999);
+                    match = {
+                        ...match,
+                        "timeStamp": { "$gte": startOfTomorrow, "$lte": endOfTomorrow }
+                    }
+                }
+                else if (req.body.deliveryDate == "This Week") {
+                    let today = new Date();
+                    let startOfWeek = new Date(today);
+                    startOfWeek.setDate(today.getDate() - today.getDay());
+                    startOfWeek.setHours(0, 0, 0, 0);
+                    let endOfWeek = new Date(today);
+                    endOfWeek.setDate(endOfWeek.getDate() + (6 - today.getDay()));
+                    endOfWeek.setHours(23, 59, 59, 999);
+                    match = {
+                        ...match,
+                        "timeStamp": { "$gte": startOfWeek, "$lte": endOfWeek }
+                    }
+                }
+                else if (req.body.deliveryDate == "This Month") {
+                    let today = new Date();
+                    let startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+                    startOfMonth.setHours(0, 0, 0, 0);
+                    let endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                    endOfMonth.setHours(23, 59, 59, 999);
+                    match = {
+                        ...match,
+                        "timeStamp": { "$gte": startOfMonth, "$lte": endOfMonth }
+                    }
+                }
+
+            }
+            if (req.body.search || req.body.deliveryType || req.body.deliveryDate) {
+                finalQuery = [{ $match: match }]
+            }
+            finalQuery = finalQuery.concat(query);
+            let result = await curdOperations.aggregateQuery(req.db, 'listings', finalQuery);
             res.status(200).send({ success: true, code: 200, data: result, message: 'successfully Fectched list.' });
         } catch (err) {
             res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
@@ -391,6 +459,7 @@ const customerController = {
                     cartData.totalPrice = (+cartData.price) + (+cartData.deliveryCharge);
                     cartData.status = 'Pending';
                     cartData.deliveryAddress = req.body.deliveryAddress;
+                    cartData.timeStamp = new Date();
                     delete cartData.finalCostWithOutDeliveryOption;
                     let bulkWrite = await curdOperations.bulkUpdateModel(req.db, 'listingOrders', bulkUpdate);
                     let insertDoc = await curdOperations.insertOne(req.db, 'orders', cartData);
@@ -406,5 +475,7 @@ const customerController = {
         }
     },
 }
-
+var isValidDate = (date) => {
+    return (new Date(date) !== "Invalid Date") && !isNaN(new Date(date));
+}
 module.exports = { customerController };
