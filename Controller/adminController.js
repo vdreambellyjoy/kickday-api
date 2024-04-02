@@ -23,9 +23,22 @@ const adminController = {
 
     getAllListings: async (req, res) => {
         try {
-            let query = [];
-            if (req.user.role != 'admin') query.push({ refMakerId: new ObjectId(req.user._id) })
-            query = [
+            let { selectedValue = "Live" } = { ...req.body };
+            let status = "Active";
+            let query = [{ $match: { delete: { $ne: true } } }];
+            if (req.user.role != 'admin') query.push({ $match: { refMakerId: new ObjectId(req.user._id) } });
+            if (selectedValue == "Live") {
+                query.push({ $match: { deActive: { $ne: true }, orderDeliveredOn: { $gte: new Date() } } });
+            }
+            if (selectedValue == "Completed") {
+                status = "Completed";
+                query.push({ $match: { deActive: { $ne: true }, orderDeliveredOn: { $lt: new Date() } } });
+            }
+            if (selectedValue == "InActive") {
+                status = "InActive";
+                query.push({ $match: { deActive: true } });
+            }
+            query = query.concat([
                 {
                     $lookup: {
                         from: "orders",
@@ -34,8 +47,15 @@ const adminController = {
                         as: "customerOrders"
                     }
                 },
-                { $addFields: { customerOrdersCount: { $size: '$customerOrders' }, customerOrders: "$$REMOVE" } }
-            ];
+                {
+                    $addFields: {
+                        createdAt: { "$toDate": { "$toLong": "$_id" } },
+                        status: status,
+                        customerOrdersCount: { $size: '$customerOrders' },
+                        customerOrders: "$$REMOVE"
+                    }
+                }
+            ]);
             let result = await curdOperations.aggregateQuery(req.db, 'listings', query);
             res.status(200).send({ success: true, code: 200, list: result, message: 'successfully Fectched list.' });
         } catch (err) {
@@ -83,6 +103,18 @@ const adminController = {
         }
     },
 
+    activeDeActiveListing: async (req, res) => {
+        try {
+            let params = {};
+            params['where'] = { _id: new ObjectId(req.body._id) };
+            params['set'] = { deActive: req.body.value };
+            let updateListing = await curdOperations.updateOne(req.db, params, 'listings', false);
+            res.status(200).send({ success: true, code: 200, message: 'successfully activated/DeActivated Listing' });
+        } catch (err) {
+            res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
+        }
+    },
+
     getAllUsersList: async (req, res) => {
         try {
             let { selectedTab } = req.body;
@@ -120,10 +152,35 @@ const adminController = {
                 {
                     $lookup: {
                         from: "listings",
-                        localField: "refMakerId",
-                        foreignField: "_id",
-                        as: "listingsData"
-                    }
+                        as: "listingsData",
+                        let: { refMakerId: "$_id" },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $and: [
+                                            {
+                                                $eq: ["$$refMakerId", "$refMakerId"]
+                                            },
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                $lookup: {
+                                    from: "orders",
+                                    localField: "_id",
+                                    foreignField: "refListingId",
+                                    as: "ordersData"
+                                }
+                            },
+                            {
+                                $addFields: {
+                                    totalAmount: { $sum: "$ordersData.totalPrice" }
+                                }
+                            },
+                        ],
+                    },
                 },
                 {
                     $lookup: {
@@ -135,6 +192,7 @@ const adminController = {
                 },
                 {
                     $addFields: {
+                        totalAmount: { $sum: "$listingsData.totalAmount" },
                         listingsCount: { $size: '$listingsData' },
                         customerOrdersCount: { $size: '$customerOrders' },
                         listingsData: '$$REMOVE',

@@ -13,6 +13,8 @@ adminRoutes.post('/ActiveDeActiveUser', adminController.activeDeActiveUser);
 adminRoutes.post('/getAllListings', adminController.getAllListings);
 adminRoutes.post('/getListingsCount', adminController.getListingsCount);
 adminRoutes.post('/getListingBasedOnId', adminController.getListingBasedOnId);
+adminRoutes.post('/activeDeActiveListing', adminController.activeDeActiveListing);
+
 
 adminRoutes.post('/createMaker', saveImagesToGridFS, adminController.createMaker);
 adminRoutes.post('/updateKitchenImages', saveImagesToGridFS, adminController.updateKitchenImages);

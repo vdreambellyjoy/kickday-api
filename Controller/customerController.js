@@ -25,6 +25,13 @@ const customerController = {
         try {
             let query = [
                 {
+                    $match: {
+                        delete: { $ne: true },
+                        deActive: { $ne: true },
+                        orderDeliveredOn: { $gte: new Date() }
+                    }
+                },
+                {
                     $lookup: {
                         from: "listingOrders",
                         localField: "_id",
