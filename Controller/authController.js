@@ -1,7 +1,8 @@
 const jwt = require('jwt-simple');
 const configFile = require('../config');
-const secret = configFile.secretKey
+const secret = configFile.secretKey;
 const { ObjectId } = require('mongodb');
+const util = require('../utilities/util');
 const readfileFromGridFs = require('../middlewares/gridFsRead');
 const curdOperations = require('../model/curdOperations');
 
@@ -72,10 +73,210 @@ const authController = {
     getlogofile: async (req, res) => {
         try {
             const { fileId } = { ...req.body };
-            const fileObject = await readfileFromGridFs(fileId,req.db);
+            const fileObject = await readfileFromGridFs(fileId, req.db);
             res.json({ ...fileObject });
         } catch (err) {
             res.status(500).send({ success: false, code: 500, error: err, message: 'something went wrong' })
+        }
+    },
+
+    checkUserToken: async (req, res) => {
+        try {
+            if (req.body.token) {
+                let parted = req.body.token.split(' ');
+                let realToken = parted.length === 2 ? parted[1] : null;
+                const decoded = util.decodeJWT(realToken, secret);
+                if (!decoded) {
+                    return res.status(401).send({ success: false, message: 'no Token Found', error: 'tokenError' });
+                }
+                if (!req.db) {
+                    return res.status(500).send({ success: false, message: 'DB connection failed', error: 'Mongo Error!' });
+                }
+                let userData = await curdOperations.findOne(req.db, 'users', { _id: new ObjectId(decoded._id) });
+                if (decoded && decoded.hasOwnProperty('tokenTime') && userData.tokenTime?.toString() == new Date(decoded.tokenTime)) {
+                    return res.status(200).send({ success: true, code: 200, data: userData, message: 'successfully Fectched userData.' });
+                } else {
+                    return res.status(401).send({ success: false, message: 'token Expired', error: 'tokenError' });
+                };
+            }
+            else {
+                res.status(401).send({ success: false, message: 'invalid token', error: 'tokenError' });
+                return res.end();
+            }
+        } catch (err) {
+            return res.status(500).send({ success: false, code: 500, error: err, message: 'something went wrong' })
+        }
+    },
+
+    getAllListingsForCustomer: async (req, res) => {
+        try {
+            let query = [
+                {
+                    $match: {
+                        delete: { $ne: true },
+                        deActive: { $ne: true },
+                        orderDeliveredOn: { $gte: new Date() }
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "listingOrders",
+                        localField: "_id",
+                        foreignField: "refListingId",
+                        as: "listingOrders"
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "refMakerId",
+                        foreignField: "_id",
+                        as: "makerData"
+                    }
+                },
+                { $unwind: '$makerData' },
+                {
+                    $project: {
+                        "makerData.kitchenImages": 0
+                    }
+                }
+            ];
+            let finalQuery = [];
+            let match = {};
+            if (req.body.search) {
+                match = {
+                    ...match,
+                    "address": { "$regex": req.body.search, "$options": "i" },
+                }
+            }
+            if (req.body.deliveryType) {
+                match = {
+                    ...match,
+                    "deliveryOptions": { "$elemMatch": { "type": req.body.deliveryType } },
+                }
+            }
+            if (req.body.deliveryDate) {
+                if (req.body.deliveryDate == "Available Today") {
+                    let today = new Date();
+                    let startOfDay = new Date(today);
+                    startOfDay.setHours(0, 0, 0, 0);
+                    let endOfDay = new Date(today);
+                    endOfDay.setHours(23, 59, 59, 999);
+                    match = {
+                        ...match,
+                        "timeStamp": { "$gte": startOfDay, "$lte": endOfDay }
+                    }
+                }
+                else if (req.body.deliveryDate == "Available Tomorrow") {
+                    let tomorrow = new Date();
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    let startOfTomorrow = new Date(tomorrow);
+                    startOfTomorrow.setHours(0, 0, 0, 0);
+                    let endOfTomorrow = new Date(tomorrow);
+                    endOfTomorrow.setHours(23, 59, 59, 999);
+                    match = {
+                        ...match,
+                        "timeStamp": { "$gte": startOfTomorrow, "$lte": endOfTomorrow }
+                    }
+                }
+                else if (req.body.deliveryDate == "This Week") {
+                    let today = new Date();
+                    let startOfWeek = new Date(today);
+                    startOfWeek.setDate(today.getDate() - today.getDay());
+                    startOfWeek.setHours(0, 0, 0, 0);
+                    let endOfWeek = new Date(today);
+                    endOfWeek.setDate(endOfWeek.getDate() + (6 - today.getDay()));
+                    endOfWeek.setHours(23, 59, 59, 999);
+                    match = {
+                        ...match,
+                        "timeStamp": { "$gte": startOfWeek, "$lte": endOfWeek }
+                    }
+                }
+                else if (req.body.deliveryDate == "This Month") {
+                    let today = new Date();
+                    let startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+                    startOfMonth.setHours(0, 0, 0, 0);
+                    let endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                    endOfMonth.setHours(23, 59, 59, 999);
+                    match = {
+                        ...match,
+                        "timeStamp": { "$gte": startOfMonth, "$lte": endOfMonth }
+                    }
+                }
+
+            }
+            if (req.body.search || req.body.deliveryType || req.body.deliveryDate) {
+                finalQuery = [{ $match: match }]
+            }
+            finalQuery = finalQuery.concat(query);
+            let result = await curdOperations.aggregateQuery(req.db, 'listings', finalQuery);
+            res.status(200).send({ success: true, code: 200, data: result, message: 'successfully Fectched list.' });
+        } catch (err) {
+            res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
+        }
+    },
+
+    getListingForUser: async (req, res) => {
+        try {
+            let query = [
+                {
+                    $match: {
+                        _id: new ObjectId(req.body._id)
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "listingOrders",
+                        localField: "_id",
+                        foreignField: "refListingId",
+                        as: "listingOrders"
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "refMakerId",
+                        foreignField: "_id",
+                        as: "makerData"
+                    }
+                },
+                { $unwind: '$makerData' },
+                {
+                    $project: {
+                        "makerData.kitchenImages": 0
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "favourites",
+                        as: "favourites",
+                        let: { refUserId: new ObjectId(req.user?._id), refListingId: "$_id" },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $and: [
+                                            { $eq: ["$refUserId", "$$refUserId"] },
+                                            { $eq: ["$refListingId", "$$refListingId"] },
+                                        ]
+                                    },
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    $addFields: {
+                        favourite: { $arrayElemAt: ["$favourites.favourite", 0] },
+                        favourites: '$$REMOVE',
+                    }
+                },
+            ];
+            let result = await curdOperations.aggregateQuery(req.db, 'listings', query);
+            result = result.length > 0 ? result[0] : {};
+            res.status(200).send({ success: true, code: 200, data: result, message: 'successfully Fectched listingData.' });
+        } catch (err) {
+            res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
         }
     },
 }

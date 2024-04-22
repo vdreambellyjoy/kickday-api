@@ -4,9 +4,9 @@ const express = require('express');
 const app = express();
 const apiRoutes = express.Router();
 const dbConnection = require('./dbConnection');
-app.use(express.json({ limit: '50mb' }))
+app.use(express.json({ limit: '200mb' }))
 app.use(cors())
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "200mb" }));
 const scripts = require('./scripts');
 
 let db;

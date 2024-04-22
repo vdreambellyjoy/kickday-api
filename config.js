@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: './kickday.env' });
 
 module.exports = {
     db_url: process.env.ENV_db_url,
