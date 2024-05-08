@@ -53,7 +53,7 @@ const adminController = {
                         createdAt: { "$toDate": "$_id" },
                         status: status,
                         customerOrdersCount: { $size: '$customerOrders' },
-                        customerOrders: "$$REMOVE"
+                        customerOrders: "$$REMOVE",
                     }
                 }
             ]);
