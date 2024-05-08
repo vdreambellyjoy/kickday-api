@@ -49,7 +49,7 @@ const adminController = {
                 },
                 {
                     $addFields: {
-                        createdAt: { "$toDate": { "$toLong": "$_id" } },
+                        createdAt: { "$toDate": "$_id" },
                         status: status,
                         customerOrdersCount: { $size: '$customerOrders' },
                         customerOrders: "$$REMOVE"
