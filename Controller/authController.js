@@ -19,6 +19,7 @@ const authController = {
                     tokenTime: new Date(),
                     lastActiveTime: new Date()
                 };
+                if (userData?.primaryRole == 'maker') params['set'].role = 'maker';
                 let updateUser = await curdOperations.updateOne(req.db, params, 'users', false);
                 let latestUserData = await curdOperations.findOne(req.db, 'users', { mobileNumber: mobile });
                 const token = jwt.encode(latestUserData, secret);
@@ -250,7 +251,7 @@ const authController = {
                     $lookup: {
                         from: "favourites",
                         as: "favourites",
-                        let: { refUserId: new ObjectId(req.user?._id), refListingId: "$_id" },
+                        let: { refUserId: ObjectId.isValid(req.body.userId) ? new ObjectId(req.body.userId) : "", refListingId: "$_id" },
                         pipeline: [
                             {
                                 $match: {

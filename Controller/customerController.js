@@ -279,13 +279,13 @@ const customerController = {
                 let orderedItems = cartData.orderedItems.map(e => new ObjectId(e._id));
                 let availableOrders = await curdOperations.findAll(req.db, 'listingOrders', { _id: { $in: orderedItems } });
                 let quantitiesValid = true;
-                let finalPrice = 0;
+                let itemCostWithoutCharges = 0;
 
                 cartData.orderedItems.forEach((orderedItem) => {
                     const correspondingDBItem = availableOrders.find((item) => item._id.toString() == orderedItem._id.toString());
                     if (correspondingDBItem) {
                         if (parseInt(orderedItem.count) > parseInt(correspondingDBItem.quantity)) quantitiesValid = false;
-                        else { finalPrice = finalPrice + (+correspondingDBItem.price * orderedItem.count) }
+                        else { itemCostWithoutCharges = itemCostWithoutCharges + (+correspondingDBItem.price * orderedItem.count) }
                     } else quantitiesValid = false;
                     bulkUpdate.push({
                         updateOne: {
@@ -300,14 +300,18 @@ const customerController = {
                     let orderCounter = await curdOperations.findOneAndUpdate(req.db, 'counters', { "name": "order" }, { "seqValue": 1 }, true, true);
                     let ID = orderCounter.value.seqValue.toString().padStart(3, '0');
                     cartData.ID = `KICK${ID}`;
-                    cartData.price = cartData.finalCostWithOutDeliveryOption;
-                    cartData.finalPrice = finalPrice;
+                    cartData.itemsCostWithoutCharges = itemCostWithoutCharges;
+                    cartData.gstPercentage = 5;
+                    cartData.gstAmount = Math.round((5 / 100) * (+itemCostWithoutCharges));
                     cartData.deliveryCharge = +cartData.deliveryOption?.price || 0;
-                    cartData.totalPrice = (+cartData.price) + (+cartData.deliveryCharge);
+                    cartData.commisionPercenatge = +req.body.deliveryAddress.commision;
+                    cartData.commisionAmount = Math.round((+req.body.deliveryAddress.commision / 100) * (+itemCostWithoutCharges));
+                    cartData.itemsCostIncludingCharges = (+cartData.itemsCostWithoutCharges) + (+cartData.gstAmount) + (cartData.deliveryCharge);
                     cartData.status = 'Pending';
                     cartData.deliveryAddress = req.body.deliveryAddress;
                     cartData.timeStamp = new Date();
                     delete cartData.finalCostWithOutDeliveryOption;
+                    delete cartData.deliveryAddress.commision;
                     let bulkWrite = await curdOperations.bulkUpdateModel(req.db, 'listingOrders', bulkUpdate);
                     let insertDoc = await curdOperations.insertOne(req.db, 'orders', cartData);
                     let result = await curdOperations.deleteOne(req.db, 'ordersTemp', { _id: _id });

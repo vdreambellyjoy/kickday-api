@@ -101,7 +101,8 @@ const makerController = {
                 for (let order of orders) {
                     order.refListingId = new ObjectId(_id);
                     order.refMakerId = req.body.role == 'admin' ? new ObjectId(refMakerId) : new ObjectId(req.user._id);
-                    orders.quantity = +orders.quantity
+                    order.quantity = +order.quantity;
+                    order.price = +order.price;
                 }
                 let insertDocs = await curdOperations.insertMany(req.db, 'listingOrders', orders);
                 delete req.body._id;
@@ -141,6 +142,20 @@ const makerController = {
             params['set'] = { status: req.body.status, timeStamp: new Date() };
             let updateUser = await curdOperations.updateOne(req.db, params, 'orders', true);
             res.status(200).send({ success: true, code: 200, data: {}, message: 'successfully updated orderStatus.' });
+        } catch (err) {
+            res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
+        }
+    },
+
+    toggleMakerStatus: async (req, res) => {
+        try {
+            let _id = new ObjectId(req.user._id);
+            let params = {};
+            params['where'] = { _id };
+            params['set'] = { role: req.body.value ? 'customer' : 'maker' };
+            let updateUser = await curdOperations.updateOne(req.db, params, 'users', false);
+            let user = await curdOperations.findOne(req.db, 'users', { _id: _id });
+            res.status(200).send({ success: true, code: 200, userData: user, message: 'successfully updated role.' });
         } catch (err) {
             res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
         }

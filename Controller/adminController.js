@@ -44,7 +44,7 @@ const adminController = {
                     $lookup: {
                         from: "orders",
                         localField: "_id",
-                        foreignField: "refOrderId",
+                        foreignField: "refListingId",
                         as: "customerOrders"
                     }
                 },
@@ -53,7 +53,7 @@ const adminController = {
                         createdAt: { "$toDate": "$_id" },
                         status: status,
                         customerOrdersCount: { $size: '$customerOrders' },
-                        customerOrders: "$$REMOVE",
+                        customerOrders: "$$REMOVE"
                     }
                 }
             ]);
@@ -94,8 +94,56 @@ const adminController = {
                     }
                 },
                 { $unwind: '$makerData' },
-                { $addFields: { customerOrdersCount: { $size: '$customerOrders' } } }
-            ];
+                {
+                    $addFields: {
+                        customerOrdersCount: { $size: '$customerOrders' },
+                        totalEarnings: {
+                            $reduce: {
+                                input: "$customerOrders", // Loop over the 'items' array
+                                initialValue: 0,
+                                in: {
+                                    $add: [
+                                        "$$value", "$$this.itemsCostIncludingCharges"
+                                    ]
+                                }
+                            }
+                        },
+                        totalDeliveryCost: {
+                            $reduce: {
+                                input: "$customerOrders", // Loop over the 'items' array
+                                initialValue: 0,
+                                in: {
+                                    $add: [
+                                        "$$value", "$$this.deliveryCharge"
+                                    ]
+                                }
+                            }
+                        },
+                        totalCommisionAmount: {
+                            $reduce: {
+                                input: "$customerOrders", // Loop over the 'items' array
+                                initialValue: 0,
+                                in: {
+                                    $add: [
+                                        "$$value", "$$this.commisionAmount"
+                                    ]
+                                }
+                            }
+                        },
+                        totalGstAmount: {
+                            $reduce: {
+                                input: "$customerOrders", // Loop over the 'items' array
+                                initialValue: 0,
+                                in: {
+                                    $add: [
+                                        "$$value", "$$this.gstAmount"
+                                    ]
+                                }
+                            }
+                        },
+                    }
+                },
+            ]
             let result = await curdOperations.aggregateQuery(req.db, 'listings', query);
             let resultCopy = result.length ? result[0] : {};
             res.status(200).send({ success: true, code: 200, data: resultCopy, message: 'successfully Fectched listingData.' });
