@@ -1,4 +1,8 @@
 const { ObjectId } = require("mongodb");
+const crypto = require("crypto");
+const Razorpay = require("razorpay");
+require('dotenv').config({ path: './kickday.env' });
+
 const curdOperations = require("../model/curdOperations");
 const customerController = {
     updateCustomerDetails: async (req, res) => {
@@ -273,6 +277,8 @@ const customerController = {
     placeOrder: async (req, res) => {
         try {
             let _id = new ObjectId(req.body._id);
+            let paymentDetails = req.body.paymentDetails;
+            let insertDoc = await curdOperations.insertOne(req.db, 'payments', { paymentDetails, tempOrderId: _id, dateTime: new Date() });
             let cartData = await curdOperations.findOne(req.db, 'ordersTemp', { _id });
             let bulkUpdate = [];
             if (cartData && req.body.deliveryAddress) {
@@ -314,7 +320,10 @@ const customerController = {
                     delete cartData.deliveryAddress.commision;
                     let bulkWrite = await curdOperations.bulkUpdateModel(req.db, 'listingOrders', bulkUpdate);
                     let insertDoc = await curdOperations.insertOne(req.db, 'orders', cartData);
-                    let result = await curdOperations.deleteOne(req.db, 'ordersTemp', { _id: _id });
+                    let params = [];
+                    params['where'] = { _id: new ObjectId(_id) };
+                    params['set'] = { orderPlaced: true };
+                    let result = await curdOperations.updateOne(req.db, params, 'ordersTemp', false);
                     res.status(200).send({ success: true, code: 200, insertedId: insertDoc.insertedId, message: 'successfully placed order.' });
                 }
             } else {
@@ -331,6 +340,47 @@ const customerController = {
             let _id = new ObjectId(req.body._id);
             let deleteOne = await curdOperations.deleteMany(req.db, 'ordersTemp', { _id: _id });
             res.status(200).send({ success: true, code: 200, data: deleteOne, message: 'successfully deleted Temp order.' });
+        } catch (err) {
+            console.log(err)
+            res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
+        }
+    },
+
+    createOrderInRazorPay: async (req, res) => {
+        try {
+            const razorpaymet = new Razorpay({ key_id: "rzp_live_0y0pOT9U7y7zzf", key_secret: "gDskRyzrF1Bi2E99ontOJuh5" });
+            const { amount, currency } = req.body;
+            const order = await razorpaymet.orders.create({ amount, currency });
+            res.status(200).send({ success: true, code: 200, order: order, message: 'successfully created order in razorPay.' });
+        } catch (err) {
+            console.log(err, 501)
+            res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
+        }
+    },
+
+    verifyPaymentDetails: async (req, res) => {
+        try {
+            const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body.verify;
+            const expectedSignature = crypto.createHmac("sha256", process.env.razorPaySecretKey).update(razorpay_order_id + "|" + razorpay_payment_id).digest("hex");
+            if (expectedSignature === razorpay_signature) {
+                res.status(200).send({ success: true, code: 200, message: 'successfully verified payment.' });
+            } else {
+                res.status(400).send({ success: false, code: 400, message: 'error at verifying payment.' });
+            }
+
+        } catch (err) {
+            console.log(err)
+            res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
+        }
+    },
+
+    savePaymentFailedDetails: async (req, res) => {
+        try {
+            req.body.tempOrderId = new ObjectId(req.body.tempOrderId)
+            req.body.dateTime = new Date();
+            let insertDoc = await curdOperations.insertOne(req.db, 'paymentErrors', req.body);
+            res.status(200).send({ success: true, code: 200, message: 'successfully saved deta.' });
+
         } catch (err) {
             console.log(err)
             res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })

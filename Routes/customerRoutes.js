@@ -3,7 +3,7 @@ const saveImagesToGridFS = require('../middlewares/uploadBase64Image')
 const { customerController } = require('../Controller/customerController');
 
 
-customerRoutes.post('/updateCustomerDetails',saveImagesToGridFS, customerController.updateCustomerDetails);
+customerRoutes.post('/updateCustomerDetails', saveImagesToGridFS, customerController.updateCustomerDetails);
 customerRoutes.post('/getCustomerOrders', customerController.getCustomerOrders);
 
 customerRoutes.post('/setFavItem', customerController.setFavItem);
@@ -16,6 +16,9 @@ customerRoutes.post('/addToCart', customerController.addToCart);
 customerRoutes.post('/getCustomerOrderSummary', customerController.getCustomerOrderSummary);
 customerRoutes.post('/placeOrder', customerController.placeOrder);
 customerRoutes.post('/deleteTempOrder', customerController.deleteTempOrder);
+customerRoutes.post('/createOrderInRazorPay', customerController.createOrderInRazorPay);
+customerRoutes.post('/verifyPaymentDetails', customerController.verifyPaymentDetails);
+customerRoutes.post('/savePaymentFailedDetails', customerController.savePaymentFailedDetails);
 
 
 
