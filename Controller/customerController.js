@@ -383,7 +383,6 @@ const customerController = {
 
         } catch (err) {
             console.log(err)
-            console.log("sample final update console message")
             res.status(500).send({ success: false, code: 500, error: err.message, message: 'something went wrong' })
         }
     },
